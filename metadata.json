@@ -1,0 +1,6 @@
+{
+  "name": "Get Sitemap Links",
+  "description": "Interactive crawler, SEO keyword pruner, and link extractor for XML sitemaps with user authentication and admin management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

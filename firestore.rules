@@ -1,0 +1,60 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isHardcodedAdmin() {
+      return isAuthenticated() && (
+        request.auth.token.email == 'tuan.le@robusltd.com' ||
+        request.auth.token.email == 'letuanthhcm@gmail.com'
+      );
+    }
+
+    function isAdmin() {
+      return isHardcodedAdmin() || (
+        isAuthenticated() &&
+        exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
+      );
+    }
+
+    // Users collection
+    match /users/{userId} {
+      // Any authenticated user can read their own profile; admins can read any user profile
+      allow get: if isOwner(userId) || isAdmin();
+      
+      // Admins can list all users for the management panel
+      allow list: if isAdmin();
+
+      // New users can create their own profile upon registration; admins can create user profiles
+      allow create: if isOwner(userId) || isAdmin();
+
+      // Users can update their own non-sensitive fields (displayName, lastLoginAt, crawlsCount)
+      // Admins can update any field (including role and status)
+      allow update: if isAdmin() || (
+        isOwner(userId) &&
+        request.resource.data.role == resource.data.role &&
+        request.resource.data.status == resource.data.status
+      );
+
+      // Only admins can delete user records
+      allow delete: if isAdmin();
+    }
+
+    // Crawl history collection
+    match /crawls/{crawlId} {
+      allow read: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      allow update: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow delete: if isAuthenticated() && (resource.data.userId == request.auth.uid || isAdmin());
+    }
+  }
+}

@@ -1,0 +1,46 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "type": "object",
+      "description": "User profile with role-based access control and activation status",
+      "properties": {
+        "uid": { "type": "string" },
+        "email": { "type": "string" },
+        "username": { "type": "string" },
+        "displayName": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "user"] },
+        "status": { "type": "string", "enum": ["active", "pending", "disabled"] },
+        "createdAt": { "type": "string" },
+        "lastLoginAt": { "type": "string" },
+        "crawlsCount": { "type": "number" },
+        "createdBy": { "type": "string" }
+      },
+      "required": ["uid", "email", "role", "status"]
+    },
+    "CrawlHistory": {
+      "title": "CrawlHistory",
+      "type": "object",
+      "description": "Sitemap crawl activity record per user",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "userEmail": { "type": "string" },
+        "targetUrl": { "type": "string" },
+        "urlCount": { "type": "number" },
+        "timestamp": { "type": "string" }
+      },
+      "required": ["userId", "targetUrl", "urlCount", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "entity": "User",
+      "description": "Individual user document keyed by user uid"
+    },
+    "/crawls/{crawlId}": {
+      "entity": "CrawlHistory",
+      "description": "Saved crawl session history"
+    }
+  }
+}

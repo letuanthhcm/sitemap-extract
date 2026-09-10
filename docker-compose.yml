@@ -1,0 +1,15 @@
+services:
+  sitemap-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sitemap-app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+    env_file:
+      - path: .env
+        required: false
