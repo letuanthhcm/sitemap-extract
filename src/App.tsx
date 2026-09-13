@@ -161,12 +161,41 @@ export default function App() {
 
       const response = await fetch('/api/sitemap/extract', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify(bodyPayload),
       });
 
-      const data = await response.json();
       stopTimer();
+
+      const contentType = response.headers.get('content-type') || '';
+      let data: any = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          data = await response.json();
+        } catch {
+          data = null;
+        }
+      }
+
+      if (!data) {
+        const rawText = await response.text();
+        let errorMsg = `Lỗi máy chủ (${response.status} ${response.statusText || 'Error'})`;
+        if (rawText.includes('<title>')) {
+          const match = rawText.match(/<title>([^<]+)<\/title>/i);
+          if (match && match[1]) {
+            errorMsg = `${match[1].trim()} (HTTP ${response.status})`;
+          }
+        } else if (rawText && rawText.trim().length > 0 && rawText.length < 300) {
+          errorMsg = rawText.trim();
+        } else if (!response.ok) {
+          errorMsg = `Máy chủ phản hồi mã lỗi HTTP ${response.status}. Vui lòng thử lại sau giây lát.`;
+        }
+        throw new Error(errorMsg);
+      }
 
       if (!response.ok || data.error) {
         throw new Error(data.error || 'Failed to extract sitemap links');
@@ -384,9 +413,16 @@ export default function App() {
     try {
       const res = await fetch('/api/sitemap/discover', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
         body: JSON.stringify({ domain: url.trim() }),
       });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        throw new Error(`Máy chủ phản hồi không đúng định dạng JSON (${res.status})`);
+      }
       const data = await res.json();
       if (data.sitemaps) {
         setDiscoveredSitemaps(data.sitemaps);
@@ -412,7 +448,14 @@ export default function App() {
     setXmlPreviewContent('');
 
     try {
-      const res = await fetch(`/api/sitemap/preview-xml?url=${encodeURIComponent(finalUrl)}`);
+      const res = await fetch(`/api/sitemap/preview-xml?url=${encodeURIComponent(finalUrl)}`, {
+        headers: { Accept: 'application/json' },
+      });
+      const ct = res.headers.get('content-type') || '';
+      if (!ct.includes('application/json')) {
+        const txt = await res.text();
+        throw new Error(txt.slice(0, 150) || `HTTP Error ${res.status}`);
+      }
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 

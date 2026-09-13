@@ -1086,17 +1086,23 @@ async function resolveInputToSitemapUrls(inputUrl: string): Promise<{
 
 async function startServer() {
   const app = express();
-  app.use(express.json({ limit: '20mb' }));
+  app.use(express.json({ limit: '50mb' }));
+  app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
   // Health check
-  app.get('/api/health', (req, res) => {
+  app.get(['/api/health', '/api/health/'], (req, res) => {
     res.json({ status: 'ok', timestamp: new Date().toISOString() });
   });
 
-  // 1. Direct extract endpoint (Supports URL or Direct raw XML Content)
-  app.post('/api/sitemap/extract', async (req, res) => {
+  // 1. Direct extract endpoint (Supports URL or Direct raw XML Content via POST or GET)
+  app.all(['/api/sitemap/extract', '/api/sitemap/extract/'], async (req, res) => {
+    if (req.method !== 'POST' && req.method !== 'GET') {
+      return res.status(405).json({ error: `Method ${req.method} not allowed. Please use POST.` });
+    }
+
     const startTime = Date.now();
     try {
+      const inputData = req.method === 'POST' ? req.body || {} : req.query || {};
       const {
         url,
         xmlContent,
@@ -1106,7 +1112,7 @@ async function startServer() {
         maxLinks = 0,
         urlFilter,
         urlExclude,
-      } = req.body;
+      } = inputData;
 
       const parsedMax = maxLinks !== undefined ? Number(maxLinks) : 0;
       const effectiveMaxLinks = isNaN(parsedMax) ? 0 : parsedMax;
@@ -1869,6 +1875,25 @@ async function startServer() {
     } catch (err: any) {
       res.status(400).json({ error: err.message || 'Failed to preview XML' });
     }
+  });
+
+  // Catch-all for API routes: Ensure all /api/* routes return JSON, never HTML or Vite SPA index.html
+  app.all('/api/*', (req, res) => {
+    res.status(404).json({
+      error: `API route not found: ${req.method} ${req.originalUrl || req.url}`,
+    });
+  });
+
+  // Global Express JSON error handler (catches JSON parse errors, payload limits, uncaught route errors)
+  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.warn('API error caught by middleware:', err?.message || err);
+    if (res.headersSent) {
+      return next(err);
+    }
+    const status = err.status || err.statusCode || 500;
+    return res.status(status).json({
+      error: err.message || 'Lỗi xử lý yêu cầu trên máy chủ',
+    });
   });
 
   // Vite middleware in development or static serve in production
